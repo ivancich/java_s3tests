@@ -25,6 +25,8 @@ done
 
 # Install Java
 
+echo "ERIC testing...."
+
 if [ -f /etc/debian_version ]; then
     for package in openjdk-8-jdk wget unzip; do
         if [ "$(dpkg --status -- $package 2>/dev/null|sed -n 's/^Status: //p')" != "install ok installed" ]; then
@@ -47,11 +49,39 @@ elif [ -f /etc/fedora-release ]; then
         sudo yum -y install $missing
     fi
 elif [ -f /etc/redhat-release ]; then
-    for package in java-1.8.0-openjdk java-1.8.0-openjdk-devel wget unzip; do
-        if [ "$(rpm -qa $package 2>/dev/null)" == "" ]; then
-            missing="${missing:+$missing }$package"
-        fi
-    done
+    version_id=$(grep ^VERSION_ID /etc/os-release | sed 's/[^"]*"\([0-9.]*\).*/\1/')
+    echo "version_id is $version_id"
+
+    echo "contents of /etc/redhat-release"
+    cat /etc/redhat-release
+
+    echo "contents of /etc/os-release"
+    cat /etc/os-release
+
+    echo "contents complete"
+
+    # test for RHEL (or equivalent) 10 (or later)
+    if expr "$version_id \>= 10.0 ;then
+       sudo dnf install adoptium-temurin-java-repository
+       sudo dnf config-manager --set-enabled adoptium-temurin-java-repository
+       sudo dnf install "temurin-17*" -y
+       export JAVA_HOME=/usr/lib/jvm/temurin-17-jdk
+       for package in wget unzip; do
+           if [ "$(rpm -qa $package 2>/dev/null)" == "" ]; then
+	       missing="${missing:+$missing }$package"
+           fi
+       done
+    else
+	for package in java-1.8.0-openjdk java-1.8.0-openjdk-devel wget unzip; do
+            if [ "$(rpm -qa $package 2>/dev/null)" == "" ]; then
+		missing="${missing:+$missing }$package"
+            fi
+	done
+	if [ -n "$missing" ]; then
+            echo "$0: missing required RPM packages. Installing via sudo." 1>&2
+            sudo yum -y install $missing
+	fi
+    fi
     if [ -n "$missing" ]; then
         echo "$0: missing required RPM packages. Installing via sudo." 1>&2
         sudo yum -y install $missing
